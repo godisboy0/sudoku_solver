@@ -1,0 +1,371 @@
+#include "stdafx.h"
+#include<iostream>
+#include<string>
+#include<sstream>
+#include<stack>
+#include<fstream>
+#include<vector>
+#include<utility>
+
+using std::cout;
+using std::endl;
+using std::cin;
+using std::stack;
+using std::vector;
+using std::pair;
+
+//解数独的程序
+//基本思路，不断寻找唯一格，如果有，先确定这个，然后再确定是否有其他唯一格
+//这样反复遍历
+
+bool error = false;
+const int CLEAR_BIT = ((1 << 9) - 1) << 1;
+
+int scan_bit(const int &a) {
+	int posibility = 0;
+	for (int i = 1; i != 10; ++i) {
+		if (a & (1 << i))//扫描到第i位有置位
+			posibility = posibility + 1;
+	}
+	return posibility;
+}
+
+bool makesure(int &a) {
+
+	if (a & 1)//最后一位已经置1，表明该值确定了
+		return true;
+	else {
+		int posibility = scan_bit(a);
+		if (posibility > 1) {//如果超过1个位置位，那么就不唯一
+			return false;
+		}
+		else if (posibility == 0) {//一个可能性都没有，这怎么可能
+			error = true;
+			return false;
+		}
+		else {
+			a |= 1;//把最后一位置1
+			return true;
+		}
+	}
+
+}
+
+int scan_init(int(&matrix)[9][9],std::string &fname) {//用二维数组来表示，用数字代表set，从而复制的工作量，返回-1表示直接出错了，要求重新输入
+
+	std::ifstream fin(fname);
+	if (fname != "") {
+		//std::ifstream fin(fname);
+		cin.rdbuf(fin.rdbuf());
+	}
+  //在这里加深了对rdbuf的认识，实际上就是把A流的缓冲区直接替换为B流，cin.rdbuf(fin.rdbuf())这个语句，就是把cin的缓冲区替换为fin的
+  //所以，假如fin存在于if代码块内，当代码块结束时，fin会被析构，导致其缓冲区被清空，这样的话，实际上cin的缓冲区也无效了，因此必须放到外面。
+	std::string line;
+	int a = 0;//每个代表一行
+	int c[9];//每个代表一列
+	for (int j = 0; j != 9; ++j)
+		c[j] = 0;
+	int b;
+	for (int i = 0; i != 9; ++i) {
+		cout << "请输入第 " << i + 1 << " 行的元素：";
+		std::getline(cin, line);
+		std::istringstream s(line);
+		if (fname != "") 
+			cout << line << endl;
+		int j = 0;//当前正在处理第几列
+		a = 0;
+		while (s >> b) {
+			if ((b != 0 && ((1 << b) & a) && ((1 << b) & c[j])) || b > 9 || b < 0) {
+				//不是0而且已经有了这个元素
+				break;
+			}
+			else {
+				if (b != 0) {
+					a |= (1 << b);
+					matrix[i][j] = (1 << b | 1);//表示该值可以取b，并且已经确定
+					c[j] |= (1 << b);
+				}
+				else {//否则就把这个数的1-9位全置1，表示都可取，第0位置0，表示尚未确定
+					matrix[i][j] = CLEAR_BIT;//1右移9位后减一，则后0-8位全部为1，此时再向左移1位，则形成000001111111110的结构。
+											 //要用等号，不能用|=，因为这个值之前是未定义的
+				}
+				for (int k = 0; k <= i; ++k) {//把之前每一行中的该值的可能性都抹去
+					if (!(matrix[k][j] & 1))
+						matrix[k][j] &= ~c[j];
+					if (makesure(matrix[k][j]))//如果确定matrix[k][j]也只有一位了，那就把他也添加到唯一集里来
+						c[j] |= matrix[k][j] & CLEAR_BIT;//防止c[j]的最后一位被置1
+				}
+			}
+			j++;
+			if (j > 9) {
+				break;
+			}
+		}
+		if (j != 9) {
+			cout << "输入出错,请重新输入" << endl;
+			error = false;
+			return -1;
+		}
+		else {//此时没有发现问题，我们用来把空格先初步填空，就是说用行列先消除一部分重复值
+			for (int k = 0; k != 9; ++k) {//用行中已经出现过的元素把该行先消除一遍重复值
+				if (!(matrix[i][k] & 1)) {//最后一位没有置1，也就是还未确定
+					matrix[i][k] &= ~a;
+					if (makesure(matrix[i][k]))//如果确定matrix[i][k]也只有一位了，那就把他也添加到唯一集里来
+						c[k] |= matrix[i][k] & CLEAR_BIT;//防止c[j]的最后一位被置1
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+void print(int(&matrix)[9][9]) {
+
+	for (int i = 0; i != 9; ++i) {
+		for (int j = 0; j != 9; ++j) {
+			cout << "#";
+			for (int k = 1; k != 10; ++k) {
+				if (matrix[i][j] & (1 << k))
+					cout << k << " ";
+				else cout << "  ";
+			}
+		}
+		cout << endl;
+	}
+	cout << endl;
+	cout << "----------------------------------------" << endl;
+	return;
+
+}
+
+void print_result(int(&matrix)[9][9]) {
+
+	cout << "----------------------------------------" << endl;
+	for (int i = 0; i != 9; ++i) {
+		for (int j = 0; j != 9; ++j) {
+			cout << "#";
+			for (int k = 1; k != 10; ++k) {
+				if (matrix[i][j] & (1 << k))
+					cout << k << " ";
+			}
+		}
+		cout << endl;
+	}
+	cout << "----------------------------------------" << endl;
+	return;
+
+}
+int howmuch(int(&matrix)[9][9]) {
+
+	int ret = 0;
+	for (int i = 0; i != 9; ++i) {
+		for (int j = 0; j != 9; ++j) {
+			if (matrix[i][j] & 1)//最后一位置1
+				++ret;
+			else
+				ret += scan_bit(matrix[i][j]);
+		}
+	}
+	return ret;
+
+}
+
+
+int caculate_squar(int(&matrix)[9][9]) {
+
+	int a = 0;
+
+	for (int x = 0; x != 3; ++x) {
+		for (int y = 0; y != 3; ++y) {
+			for (int i = x * 3; i != x * 3 + 3; ++i) {
+				for (int j = y * 3; j != y * 3 + 3; ++j) {//一个一个小方块地来，现把排除集弄出来
+					if ((matrix[i][j] & 1)) {//最后一位置1,说明唯一了
+						if (matrix[i][j] & a)//但是和前面的重复了
+							return -1;
+						else a |= matrix[i][j] & CLEAR_BIT;
+					}
+				}
+			}
+			for (int i = x * 3; i != x * 3 + 3; ++i) {
+				for (int j = y * 3; j != y * 3 + 3; ++j) {
+					if (!(matrix[i][j] & 1))//最后一位没有置1，说明不唯一
+						matrix[i][j] &= ~a;
+					if (makesure(matrix[i][j]))//如果确定matrix[k][j]也只有一位了，那就把他也添加到唯一集里来
+						a |= matrix[i][j] & CLEAR_BIT;
+				}
+			}
+			a = 0;
+		}
+	}
+	if (error)
+		return -1;
+	else return 0;
+
+}
+
+int caculate_cross(int(&matrix)[9][9]) {
+
+	int line[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int row[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	for (int i = 0; i != 9; ++i) {//先把矩阵扫描一遍，把行列的清除集并出来
+		for (int j = 0; j != 9; ++j) {
+			if (matrix[i][j] & 1) {
+				if (matrix[i][j] & line[i] || matrix[i][j] & row[j])//如果与已经确定的值重复，那么出错
+					return -1;
+				else {
+					line[i] |= matrix[i][j] & CLEAR_BIT;
+					row[j] |= matrix[i][j] & CLEAR_BIT;
+				}
+			}
+		}
+	}
+	for (int i = 0; i != 9; ++i) {
+		for (int j = 0; j != 9; ++j) {
+			if (!(matrix[i][j] & 1)) {
+				matrix[i][j] &= ~line[i];
+				matrix[i][j] &= ~row[j];
+			}
+			if (makesure(matrix[i][j])) {
+				line[i] |= matrix[i][j] & CLEAR_BIT;
+				row[j] |= matrix[i][j] & CLEAR_BIT;
+			}
+		}
+	}
+	if (error)
+		return -1;
+	else return 0;
+
+}
+
+void backup(int(&matrix)[9][9], stack<int> &store) {//把状态保存下来
+
+	for (int i = 8; i >= 0; --i) {
+		for (int j = 8; j >= 0; --j) {
+			store.push(matrix[i][j]);
+		}
+	}
+
+
+}
+
+void restore(int(&matrix)[9][9], stack<int> &store) {//把状态还原一步
+
+	for (int i = 0; i != 9; ++i) {//注意和保存的方向是逆序的
+		for (int j = 0; j != 9; ++j) {
+			matrix[i][j] = store.top();
+			store.pop();
+		}
+	}
+
+}
+
+bool isok(int(&matrix)[9][9]) {
+
+	for (int i = 0; i != 9; ++i) {
+		for (int j = 0; j != 9; ++j) {
+			if (!makesure(matrix[i][j]) || error)
+				return false;
+		}
+	}
+	return true;
+}
+
+vector<int> make_vec(int a) {
+
+	vector<int> stk;
+	for (int i = 1; i != 10; ++i) {
+		if (a & (1 << i))
+			stk.push_back((1 << i) | 1);//还要把最后一位置1
+	}
+	return stk;
+}
+
+void finmin(const int(&matrix)[9][9],int &x,int &y){
+
+	stack<pair<int,int>>  a;
+	int min = 9;//可能性最少的节点
+	int thisone;
+	for (int i = 0; i != 9; ++i) {
+		for (int j = 0; j != 9; ++j) {
+			if (matrix[i][j] & 1)
+				continue;
+			else if ((thisone = scan_bit(matrix[i][j])) < min) {
+				min = thisone;
+				a.push(std::make_pair(i, j));
+				if (min == 2)//避免不必要的扫描
+					break;
+			}
+		}
+	}
+	x = a.top().first;
+	y = a.top().second;
+	return;
+}
+
+int caculate(int(&matrix)[9][9]) {
+
+	//返回0表示搞定了
+
+	//此时先算每个小九宫格，然后再行列，然后重复
+	int lastnode = 0;
+	int thisnode = 0;
+	int ok = 0;
+	static stack<int> supertore;
+	while ((thisnode = howmuch(matrix)) != lastnode) {//当前一次返回值和此次返回值相等时，就可以退出循环了
+		if (caculate_squar(matrix) == -1)
+			return -1;
+		if (caculate_cross(matrix) == -1)
+			return -1;
+		lastnode = thisnode;
+	}
+	if (thisnode == 81) {
+		if (isok(matrix))
+			return 0;
+		else return -1;
+	}
+	int x= 0 , y = 0;
+	finmin(matrix, x, y);
+	vector<int> tmp = make_vec(matrix[x][y]);
+	for (auto it : tmp) {
+		error = false;
+		backup(matrix, supertore);
+		matrix[x][y] = it;
+		if ((ok = caculate(matrix)) == 0)
+			return 0;
+		else {
+			restore(matrix, supertore);
+		}
+	}
+	return -1;
+}
+
+int main(int argc,char **argv)
+{
+
+	std::string fname;
+	if (argc != 2) {
+		cout << "输入范例" << endl;
+		cout << "8 0 0 0 0 0 0 0 0\n0 0 3 6 0 0 0 0 0\n0 7 0 0 9 0 2 0 0\n0 5 0 0 0 7 0 0 0\n0 0 0 0 4 5 7 0 0\n0 0 0 1 0 0 0 3 0\n0 0 1 0 0 0 0 6 8\n0 0 8 5 0 0 0 1 0\n0 9 0 0 0 0 4 0 0" << endl;
+		cout << "数字0表示数独中需要填的空，每个数字之间必须有空格" << endl;
+		cout << "也可以按此格式写好后，存入一个txt，并将txt拖到本软件图标上解题" << endl;
+	}
+	else {
+		fname = argv[1];
+	}
+
+	int matrix[9][9]; //假如第i + 1个位被置1，表示这个数字可以是i，如果置0，表示不能是i，如果最后一位数字为1，则表示已经确定了
+	if (scan_init(matrix, fname) == -1) {
+		cout << "输入一定是哪里出错了，请重新输入" << endl;
+    system("pause");
+		exit(-1);
+	}
+	//print(matrix);
+	if (caculate(matrix) == -1)
+		cout << "No results" << endl;
+	else {
+		print_result(matrix);
+	}
+	system("pause");
+	return 0;
+
+}
